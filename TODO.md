@@ -3,7 +3,7 @@
 
 ## Open
 
-_geen open items_ 🎉
+- [ ] **Onderzoek `jq` dependency** — beide scripts vereisen `jq` (hard `command -v` check). Uitzoeken: is dit acceptabel voor collega's (macOS: `brew install jq`, Linux: standaard in repos), of loont het om over te stappen op iets dat standaard aanwezig is (bijv. `python3 -c` met `json`-stdlib)? Ook: zijn alle jq-expressies compatibel met de oudere `jq 1.6` (Ubuntu 20.04) of gebruiken we `jq 1.7`-only features?
 
 ## Simplification
 
@@ -31,3 +31,4 @@ _geen open items_
 - [x] **README.md** — human-readable instructies voor dagelijks gebruik (setup, workflow, betekenis van kolommen, FAQ).
 - [x] **Link naar project in issues.html** — Project-kolom is nu klikbaar naar `https://www.drupal.org/project/<slug>`.
 - [x] **Uniform data-formaat** — beide scripts schrijven nu `projects.js` in dezelfde `{generated_at, projects_count, projects: [...]}` wrapper; `update-issues.sh` is tolerant voor beide bare-array en object-input.
+- [x] **`projects-source.txt` → `projects-source.csv`** — kolommen `machine_name,status,type` (header verplicht). `status` (active/inactive) bepaalt of `update-issues.sh` issues fetcht (standaard skipt inactive; `--include-inactive`/`-a` overschrijft). `type` (module/theme) is bron van waarheid en overschrijft de API-derived `kind` in `projects.js`. `build-projects.sh` fetcht altijd alle rijen. Overgeslagen projecten behouden hun vorige `open_issues`-count.

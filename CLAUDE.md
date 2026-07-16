@@ -15,13 +15,15 @@ Geen scraping, geen build-server nodig. Alles draait lokaal op `curl` + `jq` + `
 ## Files
 
 ### Source (committed)
-- **`projects-source.txt`** — 1 machine name per regel. Bepaalt welke projecten in de output verschijnen. Handmatig te onderhouden.
+- **`projects-source.csv`** — kolommen `machine_name,status,type`. Header-rij is verplicht. Bepaalt welke projecten in de output verschijnen. Handmatig te onderhouden.
+  - `status`: `active` of `inactive`. `build-projects.sh` verwerkt beide; `update-issues.sh` slaat `inactive` standaard over (spaart requests) tenzij `--include-inactive` wordt meegegeven.
+  - `type`: `module` of `theme`. Bron van waarheid — overschrijft de API-derived `kind` in `projects.js`.
 - **`finalist-maintainers.txt`** — 1 drupal.org display-name per regel (bijv. `batigolix`, `N Sanders`). Case-insensitive gematcht tegen `/project/<nid>/maintainers.json`.
 - **`term-labels.json`** — cache van drupal.org taxonomy-term IDs → labels (maintenance/development status). Wordt automatisch bijgevuld door `build-projects.sh`.
 
 ### Scripts
-- **`build-projects.sh`** — leest `projects-source.txt`, verrijkt via drupal.org api-d7 (title, kind, status, latest release, maintainers) + `/project/<nid>/maintainers.json`, matcht tegen `finalist-maintainers.txt`, en schrijft `projects.js`.
-- **`update-issues.sh`** — leest `projects.js`, haalt de laatste 50 issues per project op via de api-d7, filtert op status en schrijft `issues.js` én overschrijft `projects.js` (met `open_issues` count per project).
+- **`build-projects.sh`** — leest `projects-source.csv`, verrijkt via drupal.org api-d7 (title, latest release, maintainers) + `/project/<nid>/maintainers.json`, matcht tegen `finalist-maintainers.txt`, en schrijft `projects.js`. Verwerkt zowel active als inactive projecten (status wordt gewoon in de output opgenomen).
+- **`update-issues.sh`** — leest `projects.js`, haalt de laatste 50 issues per project op via de api-d7 en schrijft `issues.js` + overschrijft `projects.js` (met `open_issues` count). Slaat `inactive` projecten standaard over; met `--include-inactive` / `-a` worden ook die gefetcht. Voor overgeslagen projecten blijft de vorige `open_issues`-waarde behouden.
 
 ### Viewers
 - **`projects.html`** — Grid.js tabel met kolommen: Project · Type (module/theme/distribution) · Versie · Maintenance · Security · Open issues · Finalist maintainers. Filters: Type / Finalist maintainer / Maintenance status / Open issues (>0/=0). "Open issues"-getal linkt naar `issues.html#project=<slug>`.
@@ -48,9 +50,10 @@ Beide scripts zijn idempotent. `build-projects.sh` duurt ~20 sec (73 projecten),
 
 ## Onderhoud
 
-- **Nieuw project/theme toevoegen**: regel toevoegen aan `projects-source.txt`. Zoek de exacte machine name op via `https://www.drupal.org/project/<slug>` (URL-segment na `/project/`).
+- **Nieuw project/theme toevoegen**: regel toevoegen aan `projects-source.csv` in het formaat `<machine_name>,active,<module|theme>`. Zoek de exacte machine name op via `https://www.drupal.org/project/<slug>` (URL-segment na `/project/`).
+- **Project pauzeren zonder verwijderen**: zet `status` op `inactive` in de CSV. Metadata blijft ververst via `build-projects.sh`; issues worden alleen nog gefetcht als je `./update-issues.sh --include-inactive` draait.
 - **Nieuwe Finalist medewerker**: regel toevoegen aan `finalist-maintainers.txt` met de drupal.org display name (kijk op `/u/<slug>` — de tekst in `<h1>` is de correcte naam).
-- **Projecten waar Finalist geen actieve maintainer op is verwijderen**: haal de regel uit `projects-source.txt` en run beide scripts.
+- **Projecten waar Finalist geen actieve maintainer op is verwijderen**: haal de regel uit `projects-source.csv` en run beide scripts.
 
 ## Drupal.org API-details (referentie)
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # AI generated
-# build-projects.sh — reads projects-source.txt (a list of machine names),
+# build-projects.sh — reads projects-source.csv (machine_name,status,type),
 # enriches each project via the drupal.org api-d7 and the /project/<nid>/
-# maintainers.json endpoint, and writes projects.json.
+# maintainers.json endpoint, and writes projects.js.
 #
 # Cross-references maintainers against finalist-maintainers.txt to fill the
 # finalist_maintainers array per project. Taxonomy term labels are cached in
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # ─── Defaults ────────────────────────────────────────────────────────────
-SOURCE_FILE="projects-source.txt"
+SOURCE_FILE="projects-source.csv"
 FINALIST_FILE="finalist-maintainers.txt"
 OUTPUT_FILE="projects.js"
 TERM_CACHE_FILE="term-labels.json"
@@ -71,9 +71,11 @@ export -f fetch_by_nid
 export TMPDIR API_BASE MAINTAINERS_BASE
 
 # ─── Phase 1: fetch project nodes ────────────────────────────────────────
-COUNT=$(wc -l < "$SOURCE_FILE" | tr -d ' ')
+# CSV: skip header, first column is the machine_name.
+COUNT=$(tail -n +2 "$SOURCE_FILE" | grep -c .)
 echo "Fetching $COUNT project nodes (parallel=$PARALLEL, gzip on)..." >&2
-xargs -n 1 -P "$PARALLEL" bash -c 'fetch_project "$1"' _ < "$SOURCE_FILE"
+tail -n +2 "$SOURCE_FILE" | cut -d, -f1 \
+  | xargs -n 1 -P "$PARALLEL" bash -c 'fetch_project "$1"' _
 
 # ─── Phase 2: fetch release + maintainers per nid ───────────────────────
 echo "Fetching releases + maintainers..." >&2
@@ -107,7 +109,14 @@ else
 fi
 
 : > "$TMPDIR/entries.jsonl"
-while IFS= read -r slug; do
+# CSV columns: machine_name,status,type — `kind` in output is overridden by
+# the CSV `type` value (source of truth), the API `type` is discarded.
+while IFS=, read -r slug status kind; do
+  slug=$(printf '%s' "$slug" | tr -d '\r' | tr -d '[:space:]')
+  status=$(printf '%s' "$status" | tr -d '\r' | tr -d '[:space:]')
+  kind=$(printf '%s' "$kind" | tr -d '\r' | tr -d '[:space:]')
+  [ -z "$slug" ] && continue
+
   proj_file="$TMPDIR/proj-$slug.json"
   [ -f "$proj_file" ] || { echo "  ✗ skip $slug (no project data)" >&2; continue; }
 
@@ -121,6 +130,8 @@ while IFS= read -r slug; do
     --argjson terms   "$TERMS" \
     --argjson finalist "$FINALIST_NAMES" \
     --arg slug        "$slug" \
+    --arg status      "$status" \
+    --arg kind        "$kind" \
     '
     $proj[0].list[0]                          as $p |
     ($rel[0].list[0] // null)                 as $r |
@@ -133,7 +144,8 @@ while IFS= read -r slug; do
       machine_name: $slug,
       nid: $p.nid,
       title: $p.title,
-      kind: ($p.type | sub("^project_"; "")),
+      status: $status,
+      kind: $kind,
       url: ("https://www.drupal.org/project/" + $slug),
       security_coverage: ($p.field_security_advisory_coverage // "unknown"),
       maintenance_status: ($terms[$p.taxonomy_vocabulary_44.id // ""] // null),
@@ -146,7 +158,7 @@ while IFS= read -r slug; do
       finalist_maintainers: $finalist_maintainers
     }
   ' >> "$TMPDIR/entries.jsonl"
-done < "$SOURCE_FILE"
+done < <(tail -n +2 "$SOURCE_FILE")
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
