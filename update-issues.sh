@@ -149,21 +149,27 @@ while IFS=' ' read -r nid slug; do
   echo "  ✓ $slug: $(echo "$parsed" | jq 'length') open" >&2
 done < <(jq -r '.[] | "\(.nid) \(.machine_name)"' <<<"$PROJECTS_JSON")
 
-ALL=$(jq -s 'add' "$TMPDIR"/*.parsed.json 2>/dev/null || echo '[]')
+# Merge parsed per-project issue files into a single JSON blob and stage
+# the big blobs as files so we don't blow past the per-arg limit
+# (Linux MAX_ARG_STRLEN = 128 KB) when we pass them to jq below.
+jq -s 'add // []' "$TMPDIR"/*.parsed.json 2>/dev/null > "$TMPDIR/all_issues.json" \
+  || echo '[]' > "$TMPDIR/all_issues.json"
+
+echo "$ALL_PROJECTS_JSON" > "$TMPDIR/all_projects.json"
 
 # ─── Write output files ─────────────────────────────────────────────────
 mkdir -p "$OUTPUT_DIR"
 
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-ISSUES_COUNT=$(echo "$ALL" | jq 'length')
+ISSUES_COUNT=$(jq 'length' "$TMPDIR/all_issues.json")
 
 # issues.js
 jq -n \
   --arg gen "$NOW" \
   --argjson pc "$PROJECTS_COUNT" \
   --argjson ic "$ISSUES_COUNT" \
-  --argjson issues "$ALL" \
-  '{generated_at: $gen, projects_count: $pc, issues_count: $ic, issues: $issues}' \
+  --slurpfile issues_wrap "$TMPDIR/all_issues.json" \
+  '{generated_at: $gen, projects_count: $pc, issues_count: $ic, issues: $issues_wrap[0]}' \
   | { echo "// AI generated - regenerate via update-issues.sh"; printf 'window.issuesData = '; cat; echo ';'; } \
   > "$OUTPUT_DIR/issues.js"
 
@@ -173,13 +179,15 @@ jq -n \
 PROCESSED_SLUGS=$(jq '[.[].machine_name]' <<<"$PROJECTS_JSON")
 
 jq -n \
-  --argjson projects "$ALL_PROJECTS_JSON" \
+  --slurpfile projects_wrap "$TMPDIR/all_projects.json" \
   --argjson processed "$PROCESSED_SLUGS" \
-  --argjson issues "$ALL" \
+  --slurpfile issues_wrap "$TMPDIR/all_issues.json" \
   --arg gen "$NOW" \
   --argjson pc "$ALL_COUNT" \
   --argjson ic "$ISSUES_COUNT" \
   '
+    ($projects_wrap[0]) as $projects |
+    ($issues_wrap[0])   as $issues   |
     ($issues | group_by(.project) | map({key: .[0].project, value: length}) | from_entries) as $counts |
     {
       generated_at: $gen,
