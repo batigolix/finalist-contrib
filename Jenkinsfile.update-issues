@@ -22,8 +22,8 @@ pipeline {
     parameters {
         string(
             name: 'BUILD_PROJECTS_JOB',
-            defaultValue: 'Build projects',
-            description: 'Jenkins job name that produces projects.js as an artifact.'
+            defaultValue: 'Contrib/Build projects',
+            description: 'Path (incl. folder) to the Jenkins job that produces projects.js as an artifact. Use folder/job format for jobs inside a folder.'
         )
         booleanParam(
             name: 'INCLUDE_INACTIVE',
