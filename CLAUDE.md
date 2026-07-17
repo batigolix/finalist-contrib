@@ -29,6 +29,11 @@ Geen scraping, geen build-server nodig. Alles draait lokaal op `curl` + `jq` + `
 - **`projects.html`** — Grid.js tabel met kolommen: Project · Type (module/theme/distribution) · Versie · Maintenance · Security · Open issues · Finalist maintainers. Filters: Type / Finalist maintainer / Maintenance status / Open issues (>0/=0). "Open issues"-getal linkt naar `issues.html#project=<slug>`.
 - **`issues.html`** — Grid.js tabel met open issues per project (Project · Status · Titel · Gewijzigd). Filters: Project / Status. Leest `#project=<slug>` uit de URL-hash om vooraf te filteren.
 
+### Frontend assets
+- **`vendor/gridjs/`** — gevendorde Grid.js dist-files (JS + mermaid theme CSS). Versie in `VERSION`-bestand; bijwerken = twee curl-commando's uit dat bestand + version-bump.
+- **`assets/css/`** — per-page stylesheets (`projects.css`, `issues.css`).
+- **`assets/js/`** — per-page init-scripts (`projects-init.js`, `issues-init.js`). De HTMLs bevatten geen inline `<script>` of `<style>` meer, zodat ze onder Jenkins' default Content-Security-Policy header werken (HTML Publisher).
+
 ### Generated (gitignored)
 - `projects.js` — output van `build-projects.sh` (en `update-issues.sh` voor open_issues-count).
 - `issues.js` — output van `update-issues.sh`.

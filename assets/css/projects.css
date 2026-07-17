@@ -1,0 +1,85 @@
+/* AI generated */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  max-width: 1600px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  color: #222;
+}
+h1 { margin-bottom: 0.25rem; }
+.meta { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
+nav { margin-bottom: 1.5rem; }
+nav a {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background: #f0f0f0;
+  color: #333;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin-right: 0.5rem;
+}
+nav a.current { background: #0074bd; color: white; }
+nav a:hover { background: #e0e0e0; }
+nav a.current:hover { background: #005f99; }
+a { color: #0074bd; text-decoration: none; }
+a:hover { text-decoration: underline; }
+#filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+#filters label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  color: #555;
+}
+#filters select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.95rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  min-width: 180px;
+}
+#filters button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+#filters button:hover { background: #f5f5f5; }
+.zero { color: #999; }
+.machine { font-family: ui-monospace, monospace; font-size: 0.85rem; color: #777; }
+.kind {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+.kind-module       { background: #e7f0ff; color: #1e4a99; }
+.kind-theme        { background: #ffe7f0; color: #991e5a; }
+.kind-distribution { background: #fff4e0; color: #995a1e; }
+.kind-other        { background: #eee; color: #666; }
+.status-active      { color: #155724; }
+.status-minimal     { color: #a17400; }
+.status-seeking     { color: #b04040; }
+.status-unsupported { color: #999; text-decoration: line-through; }
+.security-covered    { color: #155724; font-size: 0.85rem; }
+.security-notcovered { color: #a02020; font-size: 0.85rem; }
+.maintainer {
+  display: inline-block;
+  padding: 1px 6px;
+  background: #eef2f7;
+  color: #445;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  margin: 1px 2px 1px 0;
+}

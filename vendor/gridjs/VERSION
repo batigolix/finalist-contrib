@@ -1,0 +1,8 @@
+Grid.js 6.2.0
+Source: https://unpkg.com/gridjs@6.2.0/dist/
+Downloaded: 2026-07-17
+
+To update:
+  curl -sSL -o gridjs.production.min.js https://unpkg.com/gridjs/dist/gridjs.production.min.js
+  curl -sSL -o mermaid.min.css https://unpkg.com/gridjs/dist/theme/mermaid.min.css
+  # then bump the version line above manually
