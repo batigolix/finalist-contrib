@@ -22,7 +22,7 @@ pipeline {
     parameters {
         string(
             name: 'BUILD_PROJECTS_JOB',
-            defaultValue: 'finalist-contrib-build-projects',
+            defaultValue: 'Build projects',
             description: 'Jenkins job name that produces projects.js as an artifact.'
         )
         booleanParam(
