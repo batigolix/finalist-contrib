@@ -3,7 +3,7 @@ ab_paragraphs,active,module
 ahrefs,active,module
 ai_provider_stackit,active,module
 browser_warning_block,active,module
-chameleon,active,module
+chameleon,active,theme
 ckeditor_bs_tooltip,active,module
 cloudflare_email,active,module
 cm_commerce,active,module
@@ -24,8 +24,8 @@ flags,active,module
 flightcontrol,inactive,module
 flood_control,active,module
 flood_unblock,active,module
-fortytwo,active,module
-fortytwo_admin,inactive,module
+fortytwo,active,theme
+fortytwo_admin,inactive,theme
 fortytwo_admin_toolbar,active,module
 githubwidget,active,module
 i18n_node_reference,active,module

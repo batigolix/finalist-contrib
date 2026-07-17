@@ -1,0 +1,90 @@
+// AI generated
+// Jenkinsfile.update-issues — daily refresh of open issues per project.
+//
+// Copies the latest projects.js artifact from the build-projects job,
+// runs ./update-issues.sh, and archives the refreshed projects.js +
+// issues.js as artifacts.
+//
+// Requirements on the Jenkins agent:
+//   - bash, curl, jq (jq >= 1.6)
+//   - outbound HTTPS to www.drupal.org
+//   - Copy Artifact Plugin installed on the Jenkins controller
+//   - The upstream build-projects job must have at least one successful build
+
+pipeline {
+    agent any
+
+    triggers {
+        // Weekdays 07:00 (Jenkins system timezone). ~10 sec runtime.
+        cron('H 7 * * 1-5')
+    }
+
+    parameters {
+        string(
+            name: 'BUILD_PROJECTS_JOB',
+            defaultValue: 'finalist-contrib-build-projects',
+            description: 'Jenkins job name that produces projects.js as an artifact.'
+        )
+        booleanParam(
+            name: 'INCLUDE_INACTIVE',
+            defaultValue: false,
+            description: 'Also fetch issues for projects with status="inactive" in projects-source.csv.'
+        )
+    }
+
+    options {
+        timeout(time: 5, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '30'))
+        ansiColor('xterm')
+        timestamps()
+    }
+
+    stages {
+        stage('Preflight') {
+            steps {
+                sh '''
+                    set -e
+                    command -v curl >/dev/null || { echo "curl required" >&2; exit 2; }
+                    command -v jq   >/dev/null || { echo "jq required"   >&2; exit 2; }
+                    jq --version
+                '''
+            }
+        }
+
+        stage('Fetch projects.js from build-projects') {
+            steps {
+                copyArtifacts(
+                    projectName: params.BUILD_PROJECTS_JOB,
+                    selector: lastSuccessful(),
+                    filter: 'projects.js',
+                    fingerprintArtifacts: true
+                )
+                sh 'test -s projects.js || { echo "projects.js empty or missing after copyArtifacts" >&2; exit 2; }'
+            }
+        }
+
+        stage('Update issues') {
+            steps {
+                sh '''
+                    set -e
+                    if [ "${INCLUDE_INACTIVE}" = "true" ]; then
+                        ./update-issues.sh --include-inactive
+                    else
+                        ./update-issues.sh
+                    fi
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            archiveArtifacts artifacts: 'projects.js, issues.js',
+                             fingerprint: true,
+                             onlyIfSuccessful: true
+        }
+        failure {
+            echo 'update-issues.sh failed — check copyArtifacts (upstream job name?) and drupal.org connectivity.'
+        }
+    }
+}

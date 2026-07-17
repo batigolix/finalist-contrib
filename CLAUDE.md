@@ -33,6 +33,11 @@ Geen scraping, geen build-server nodig. Alles draait lokaal op `curl` + `jq` + `
 - `projects.js` — output van `build-projects.sh` (en `update-issues.sh` voor open_issues-count).
 - `issues.js` — output van `update-issues.sh`.
 
+### Jenkins (optioneel)
+- **`Jenkinsfile.build-projects`** — wekelijkse pipeline (maandag 06:00) die `build-projects.sh` draait en `projects.js` + `term-labels.json` archiveert als build artifacts.
+- **`Jenkinsfile.update-issues`** — dagelijkse pipeline (werkdagen 07:00) die via de Copy Artifact plugin `projects.js` uit de build-projects job trekt, `update-issues.sh` draait en `projects.js` + `issues.js` archiveert. Heeft een `INCLUDE_INACTIVE` boolean-parameter.
+- Jobs verwachten `curl` + `jq` op de agent en outbound HTTPS naar www.drupal.org. De update-issues job noemt de build-projects job standaard `finalist-contrib-build-projects` (via job-parameter aanpasbaar).
+
 ## Workflow
 
 ```bash

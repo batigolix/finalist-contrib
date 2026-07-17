@@ -1,0 +1,61 @@
+// AI generated
+// Jenkinsfile.build-projects — weekly refresh of drupal.org project metadata.
+//
+// Runs ./build-projects.sh, which reads projects-source.csv and writes
+// projects.js (+ updates term-labels.json cache). Both are archived as
+// Jenkins build artifacts. The `update-issues` job downstream copies the
+// projects.js artifact from this job via the Copy Artifact plugin.
+//
+// Requirements on the Jenkins agent:
+//   - bash, curl, jq (jq >= 1.6)
+//   - outbound HTTPS to www.drupal.org
+//
+// Configure in Jenkins as a Pipeline job pointing at this file. The job
+// name must match the `BUILD_PROJECTS_JOB` parameter of the update-issues
+// job (default there: `finalist-contrib-build-projects`).
+
+pipeline {
+    agent any
+
+    triggers {
+        // Monday 06:00 (Jenkins system timezone). ~20 sec runtime.
+        cron('H 6 * * 1')
+    }
+
+    options {
+        timeout(time: 5, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '20'))
+        ansiColor('xterm')
+        timestamps()
+    }
+
+    stages {
+        stage('Preflight') {
+            steps {
+                sh '''
+                    set -e
+                    command -v curl >/dev/null || { echo "curl required" >&2; exit 2; }
+                    command -v jq   >/dev/null || { echo "jq required"   >&2; exit 2; }
+                    jq --version
+                '''
+            }
+        }
+
+        stage('Build projects.js') {
+            steps {
+                sh './build-projects.sh'
+            }
+        }
+    }
+
+    post {
+        success {
+            archiveArtifacts artifacts: 'projects.js, term-labels.json',
+                             fingerprint: true,
+                             onlyIfSuccessful: true
+        }
+        failure {
+            echo 'build-projects.sh failed — see console log for the failing HTTP call or jq expression.'
+        }
+    }
+}
