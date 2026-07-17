@@ -74,6 +74,36 @@ pipeline {
                 '''
             }
         }
+
+        stage('Stage HTML report') {
+            steps {
+                sh '''
+                    set -e
+                    rm -rf report
+                    mkdir -p report/assets/css report/assets/js report/vendor/gridjs
+                    cp projects.html issues.html projects.js issues.js report/
+                    cp assets/css/projects.css assets/css/issues.css report/assets/css/
+                    cp assets/js/projects-init.js assets/js/issues-init.js report/assets/js/
+                    cp vendor/gridjs/gridjs.production.min.js vendor/gridjs/mermaid.min.css report/vendor/gridjs/
+                '''
+            }
+        }
+
+        stage('Publish HTML report') {
+            steps {
+                // Requires the HTML Publisher Plugin. Under Jenkins' default
+                // Content-Security-Policy the viewers work because there is
+                // no inline <script>/<style> (extracted to assets/).
+                publishHTML(target: [
+                    reportDir:             'report',
+                    reportFiles:           'projects.html,issues.html',
+                    reportName:            'Finalist projecten',
+                    keepAll:               true,
+                    alwaysLinkToLastBuild: true,
+                    allowMissing:          false
+                ])
+            }
+        }
     }
 
     post {
