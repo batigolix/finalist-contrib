@@ -97,7 +97,7 @@ pipeline {
                 publishHTML(target: [
                     reportDir:             'report',
                     reportFiles:           'projects.html,issues.html',
-                    reportName:            'Finalist projecten',
+                    reportName:            'Finalist contrib issues & projecten',
                     keepAll:               true,
                     alwaysLinkToLastBuild: true,
                     allowMissing:          false
