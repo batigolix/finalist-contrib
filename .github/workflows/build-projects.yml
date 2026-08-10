@@ -1,0 +1,49 @@
+# AI generated
+# build-projects.yml — weekly refresh of drupal.org project metadata.
+#
+# Runs ./build-projects.sh, which reads projects-source.csv and writes
+# projects.js (+ updates term-labels.json cache). Both are uploaded as a
+# workflow artifact so update-issues.yml can pick them up.
+
+name: Build projects
+
+on:
+  schedule:
+    # Monday 05:00 UTC (~06:00/07:00 Europe/Amsterdam). ~20 sec runtime.
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-projects
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preflight (curl + jq)
+        run: |
+          set -e
+          command -v curl >/dev/null || { echo "curl required" >&2; exit 2; }
+          command -v jq   >/dev/null || { echo "jq required"   >&2; exit 2; }
+          jq --version
+
+      - name: Build projects.js
+        run: ./build-projects.sh
+
+      - name: Upload projects artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: projects
+          path: |
+            projects.js
+            term-labels.json
+          if-no-files-found: error
+          retention-days: 30

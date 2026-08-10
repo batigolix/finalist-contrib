@@ -1,0 +1,117 @@
+# AI generated
+# update-issues.yml — daily refresh of open issues per project + Pages deploy.
+#
+# Downloads the latest projects.js artifact from the "Build projects" workflow,
+# runs ./update-issues.sh, stages a report/ directory (mirroring the Jenkins
+# HTML Publisher output) and deploys it to GitHub Pages.
+#
+# Prerequisites (one-time, in the repo Settings → Pages):
+#   - Source: "GitHub Actions"
+# The workflow_run trigger also chains this after every successful
+# "Build projects" run so a fresh build is followed immediately by an
+# issue refresh + Pages deploy.
+
+name: Update issues
+
+on:
+  schedule:
+    # Weekdays 06:00 UTC (~07:00/08:00 Europe/Amsterdam). ~10 sec runtime.
+    - cron: '23 6 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      include_inactive:
+        description: 'Also fetch issues for status="inactive" projects'
+        type: boolean
+        default: false
+  workflow_run:
+    workflows: ['Build projects']
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    # Skip the workflow_run instance when the upstream build failed.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preflight (curl + jq)
+        run: |
+          set -e
+          command -v curl >/dev/null || { echo "curl required" >&2; exit 2; }
+          command -v jq   >/dev/null || { echo "jq required"   >&2; exit 2; }
+          jq --version
+
+      - name: Download projects.js from latest Build projects run
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: build-projects.yml
+          workflow_conclusion: success
+          name: projects
+          path: .
+          if_no_artifact_found: fail
+
+      - name: Sanity check projects.js
+        run: test -s projects.js || { echo "projects.js empty or missing" >&2; exit 2; }
+
+      - name: Update issues
+        run: |
+          set -e
+          if [ "${{ inputs.include_inactive }}" = "true" ]; then
+            ./update-issues.sh --include-inactive
+          else
+            ./update-issues.sh
+          fi
+
+      - name: Stage HTML report
+        run: |
+          set -e
+          rm -rf report
+          mkdir -p report/assets/css report/assets/js report/vendor/gridjs
+          cp projects.html issues.html projects.js issues.js report/
+          cp assets/css/projects.css assets/css/issues.css report/assets/css/
+          cp assets/js/projects-init.js assets/js/issues-init.js report/assets/js/
+          cp vendor/gridjs/gridjs.production.min.js vendor/gridjs/mermaid.min.css report/vendor/gridjs/
+          # Landing page: redirect / → projects.html.
+          cat > report/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>Finalist contrib</title>
+          <meta http-equiv="refresh" content="0; url=projects.html">
+          <link rel="canonical" href="projects.html">
+          <p><a href="projects.html">Ga naar projecten</a></p>
+          HTML
+
+      - name: Upload refreshed data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: data
+          path: |
+            projects.js
+            issues.js
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: report
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
