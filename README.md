@@ -37,19 +37,24 @@ Beide scripts zijn idempotent. `update-issues.sh` kun je vaker draaien dan `buil
 
 ## De twee lijsten die je zelf onderhoudt
 
-Twee txt-bestanden zijn de "bron van waarheid" — verander die, run de scripts, en de rest gaat vanzelf.
+Twee bestanden zijn de "bron van waarheid" — verander die, run de scripts, en de rest gaat vanzelf.
 
-### `projects-source.txt` — welke projecten willen we volgen?
+### `projects-source.csv` — welke projecten willen we volgen?
 
-Eén machine name per regel. Machine name = het slug in de drupal.org URL:
+CSV met drie kolommen en een verplichte header-rij:
 
 ```
-https://www.drupal.org/project/flood_control
-                                ^^^^^^^^^^^^
-                                machine name
+machine_name,status,type
+flood_control,active,module
+chameleon,inactive,theme
 ```
 
-- **Project toevoegen**: nieuwe regel in het bestand, run beide scripts.
+- **`machine_name`**: het slug in de drupal.org URL (`https://www.drupal.org/project/flood_control` → `flood_control`).
+- **`status`**: `active` of `inactive`. `build-projects.sh` verwerkt beide; `update-issues.sh` slaat `inactive` standaard over (spaart requests) tenzij je `--include-inactive` / `-a` meegeeft.
+- **`type`**: `module` of `theme`. Deze waarde overschrijft de API-derived kind in `projects.js`.
+
+- **Project toevoegen**: nieuwe regel toevoegen, run beide scripts.
+- **Project pauzeren**: zet `status` op `inactive`. Metadata blijft bijwerken; issues worden niet meer gefetcht.
 - **Project verwijderen**: regel weghalen, run beide scripts.
 
 ### `finalist-maintainers.txt` — wie zijn Finalist-medewerkers?
@@ -100,7 +105,7 @@ sed '1d; s/^window\.[a-zA-Z]*Data = //; s/;$//' projects.js | jq .
 Drupal.org zit achter Fastly-CDN met 15 min cache. Twee runs binnen 15 min = warm cache = seconds. Verse runs = ±1 request per project × 73 = ~15 sec cold cache.
 
 **Er staat een project in de lijst waar geen Finalist meer aan werkt.**  
-Regel uit `projects-source.txt` halen en beide scripts opnieuw draaien.
+Regel uit `projects-source.csv` halen en beide scripts opnieuw draaien.
 
 **Ik zie een nieuwe Finalist-collega die op drupal.org actief is maar niet in de tabel staat.**  
 Regel toevoegen aan `finalist-maintainers.txt` met de exacte display name. Daarna `build-projects.sh`.
