@@ -39,6 +39,7 @@ media_entity_unsplash,active,module
 menu_normalizer,active,module
 message_pusher,active,module
 migrate_devel,active,module
+migrate_child_entity_generate,active,module
 mollie_donations,active,module
 mom,active,module
 mongodb,active,module
