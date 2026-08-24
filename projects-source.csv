@@ -14,8 +14,8 @@ cookiebot_gtm,active,module
 copilot,active,module
 country,active,module
 data_hover_filter,active,module
-digitalworkplace,active,module
-digitalworkspace,active,module
+digitalworkplace,inactive,module
+digitalworkspace,inactive,module
 drush_async_api,inactive,module
 dynamic_layouts,active,module
 entity_lifecycle,active,module
