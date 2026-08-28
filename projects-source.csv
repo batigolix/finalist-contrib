@@ -44,6 +44,7 @@ mollie_donations,active,module
 mom,active,module
 mongodb,active,module
 o365,active,module
+o365_fullcalendar,active,module
 openid_connect_windows_aad,active,module
 path_file,active,module
 pgsql_fallback,active,module
