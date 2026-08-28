@@ -75,6 +75,7 @@ Bij de eerstvolgende `build-projects.sh` run zie je in projects.html of de match
 | Project | Titel + link naar de drupal.org project-pagina |
 | Type | module / theme / distribution / (drupalorg/general voor bijzondere entries) |
 | Versie | Nummer van de laatste stable release |
+| Drupal | Ondersteunde Drupal-cores (bijv. `10 11 12`) — union van de `core_compatibility` van de nieuwste release op elke supported branch. `—` als er geen releases zijn. Sorteert op hoogste ondersteunde major. |
 | Maintenance | drupal.org maintenance-status ("Actively maintained", "Minimally maintained", "Seeking co-maintainer(s)", "Unsupported", ...) |
 | Security | Of het project onder de drupal.org security-advisory policy valt |
 | Open issues | Aantal open issues; klik → filterde issues-view |
