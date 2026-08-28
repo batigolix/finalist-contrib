@@ -18,6 +18,7 @@ TERM_CACHE_FILE="term-labels.json"
 PARALLEL=5
 API_BASE="https://www.drupal.org/api-d7"
 MAINTAINERS_BASE="https://www.drupal.org/project"
+UPDATES_BASE="https://updates.drupal.org/release-history"
 
 # ─── Prereqs ─────────────────────────────────────────────────────────────
 command -v curl >/dev/null || { echo "curl required" >&2; exit 2; }
@@ -68,7 +69,58 @@ fetch_by_nid() {
              '{}' || true
 }
 export -f fetch_by_nid
-export TMPDIR API_BASE MAINTAINERS_BASE
+
+# Release-history XML per slug — different host (updates.drupal.org) so a
+# separate worker. Body is XML, not JSON; empty file on failure.
+fetch_release_history() {
+  local slug="$1"
+  local out="$TMPDIR/rh-$slug.xml"
+  local tries=0
+  while [ $tries -lt 3 ]; do
+    if curl -sS --compressed --fail -o "$out" "${UPDATES_BASE}/${slug}/current"; then
+      return 0
+    fi
+    tries=$((tries + 1))
+    sleep 1
+  done
+  : > "$out"
+  return 1
+}
+export -f fetch_release_history
+export TMPDIR API_BASE MAINTAINERS_BASE UPDATES_BASE
+
+# Extract supported Drupal cores as a JSON array of majors (e.g. [10,11]).
+# For each supported branch (per <supported_branches>) takes the NEWEST
+# release's <core_compatibility> and unions the majors — handles constraint
+# strings like "^10.2 || ^11", "~11.1", "8.x", ">=8", "&gt;=8".
+parse_supported_cores() {
+  local xml="$1"
+  [ -s "$xml" ] || { echo '[]'; return; }
+  grep -q '<error>' "$xml" && { echo '[]'; return; }
+  local branches
+  branches=$(sed -n 's|.*<supported_branches>\([^<]*\)</supported_branches>.*|\1|p' "$xml")
+  [ -z "$branches" ] && { echo '[]'; return; }
+  sed 's|<release>|\n<release>|g' "$xml" | awk -v branches="$branches" '
+    /<release>/ {
+      v = ""; cc = ""
+      if (match($0, /<version>[^<]*<\/version>/)) v = substr($0, RSTART+9, RLENGTH-19)
+      if (match($0, /<core_compatibility>[^<]*<\/core_compatibility>/)) cc = substr($0, RSTART+20, RLENGTH-41)
+      if (v == "" || cc == "") next
+      n = split(branches, prefixes, ",")
+      for (i = 1; i <= n; i++) {
+        p = prefixes[i]
+        if (p == "") continue
+        if (index(v, p) == 1) {
+          if (!(p in seen)) { seen[p] = 1; print cc }
+          break
+        }
+      }
+    }
+  ' | tr '|' '\n' \
+    | awk '{ if (match($0, /[0-9]+/)) print substr($0, RSTART, RLENGTH) }' \
+    | sort -un \
+    | jq -R -s -c 'split("\n") | map(select(length>0) | tonumber)'
+}
 
 # ─── Phase 1: fetch project nodes ────────────────────────────────────────
 # CSV: skip header, first column is the machine_name.
@@ -81,6 +133,11 @@ tail -n +2 "$SOURCE_FILE" | cut -d, -f1 \
 echo "Fetching releases + maintainers..." >&2
 jq -r '.list[0].nid // empty' "$TMPDIR"/proj-*.json 2>/dev/null | sort -u \
   | xargs -n 1 -P "$PARALLEL" bash -c 'fetch_by_nid "$1"' _
+
+# ─── Phase 2b: fetch release-history XML per slug (for supported cores) ─
+echo "Fetching release-history XML..." >&2
+tail -n +2 "$SOURCE_FILE" | cut -d, -f1 | tr -d ' \r' | grep -v '^$' \
+  | xargs -n 1 -P "$PARALLEL" bash -c 'fetch_release_history "$1"' _
 
 # ─── Phase 3: resolve unknown taxonomy term labels (cached across runs) ─
 echo "Resolving taxonomy term labels..." >&2
@@ -123,12 +180,15 @@ while IFS=, read -r slug status kind; do
   nid=$(jq -r '.list[0].nid // empty' "$proj_file")
   [ -z "$nid" ] && { echo "  ✗ skip $slug (no nid)" >&2; continue; }
 
+  cores_json=$(parse_supported_cores "$TMPDIR/rh-$slug.xml")
+
   jq -n \
     --slurpfile proj  "$proj_file" \
     --slurpfile rel   "$TMPDIR/rel-$nid.json" \
     --slurpfile maint "$TMPDIR/maint-$nid.json" \
     --argjson terms   "$TERMS" \
     --argjson finalist "$FINALIST_NAMES" \
+    --argjson cores   "$cores_json" \
     --arg slug        "$slug" \
     --arg status      "$status" \
     --arg kind        "$kind" \
@@ -154,6 +214,7 @@ while IFS=, read -r slug status kind; do
       has_releases:    $p.field_project_has_releases,
       latest_version: ($r.field_release_version // null),
       latest_release_date: (if ($r.created // null) then ($r.created | tonumber | strftime("%Y-%m-%d")) else null end),
+      supported_cores: $cores,
       maintainers: $all_maintainers,
       finalist_maintainers: $finalist_maintainers
     }

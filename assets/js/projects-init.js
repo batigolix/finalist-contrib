@@ -60,7 +60,7 @@
         id: 'title',
         name: 'Project',
         formatter: (v, row) => gridjs.html(
-          `<a href="${row.cells[5].data}" target="_blank" rel="noopener">${v}</a>`
+          `<a href="${row.cells[6].data}" target="_blank" rel="noopener">${v}</a>`
         )
       },
       {
@@ -74,6 +74,17 @@
         name: 'Versie',
         width: '110px',
         formatter: (v) => v || gridjs.html('<span class="zero">—</span>')
+      },
+      {
+        id: 'supported_cores',
+        name: 'Drupal',
+        width: '130px',
+        // Sort by highest supported major so newest-supporting projects float up.
+        sort: { compare: (a, b) => (b?.[b.length - 1] || 0) - (a?.[a.length - 1] || 0) },
+        formatter: (v) => {
+          if (!v || v.length === 0) return gridjs.html('<span class="zero">—</span>');
+          return gridjs.html(v.map(c => `<span class="core core-${c}">${c}</span>`).join(' '));
+        }
       },
       {
         id: 'maintenance_status',
@@ -95,7 +106,7 @@
         width: '110px',
         formatter: (v, row) => {
           if (v === 0) return gridjs.html('<span class="zero">0</span>');
-          const slug = row.cells[6].data;
+          const slug = row.cells[7].data;
           return gridjs.html(`<a href="issues.html#project=${encodeURIComponent(slug)}">${v}</a>`);
         }
       },

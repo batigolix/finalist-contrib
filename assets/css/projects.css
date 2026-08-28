@@ -83,3 +83,17 @@ a:hover { text-decoration: underline; }
   font-size: 0.8rem;
   margin: 1px 2px 1px 0;
 }
+.core {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 1px 2px 1px 0;
+  background: #eee;
+  color: #666;
+}
+.core-10 { background: #dbe9f5; color: #1e4a99; }
+.core-11 { background: #0074bd; color: #fff; }
+.core-12 { background: #ffe0ee; color: #99145a; }
