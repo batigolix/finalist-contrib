@@ -37,6 +37,12 @@ a:hover { text-decoration: underline; }
   font-size: 0.85rem;
   color: #555;
 }
+#filters label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  padding-bottom: 0.35rem;
+}
 #filters select {
   padding: 0.35rem 0.5rem;
   font-size: 0.95rem;

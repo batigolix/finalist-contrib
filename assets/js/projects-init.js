@@ -135,12 +135,15 @@
   }).render(document.getElementById('table'));
 
   // Filter logic.
+  const activeOnly = document.getElementById('filter-active-only');
   function applyFilters() {
     const k = kindSelect.value;
     const f = finalistSelect.value;
     const s = statSelect.value;
     const i = document.getElementById('filter-issues').value;
+    const onlyActive = activeOnly.checked;
     const filtered = allProjects.filter(p => {
+      if (onlyActive && (p.status || 'active') !== 'active') return false;
       if (k && p.kind !== k) return false;
       if (f && !(p.finalist_maintainers || []).includes(f)) return false;
       if (s && p.maintenance_status !== s) return false;
@@ -151,11 +154,15 @@
     grid.updateConfig({ data: filtered }).forceRender();
   }
 
-  [kindSelect, finalistSelect, statSelect, document.getElementById('filter-issues')]
+  [kindSelect, finalistSelect, statSelect, document.getElementById('filter-issues'), activeOnly]
     .forEach(el => el.addEventListener('change', applyFilters));
   document.getElementById('filter-clear').addEventListener('click', () => {
     [kindSelect, finalistSelect, statSelect, document.getElementById('filter-issues')]
       .forEach(el => el.value = '');
+    activeOnly.checked = false;
     applyFilters();
   });
+
+  // Apply the default "only active" filter on load.
+  applyFilters();
 })();
