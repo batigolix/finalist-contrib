@@ -25,15 +25,18 @@ Verder niets. Geen build-server, geen dependencies, geen `npm install`. Grid.js 
 # 1. Ververs project-metadata (title, versie, maintainers, status)
 ./build-projects.sh          # ±20 sec
 
-# 2. Ververs open issues + count per project
+# 2a. Ververs open issues voor projecten met issues op drupal.org
 ./update-issues.sh           # ±2-10 sec
+
+# 2b. Ververs open issues voor projecten waarvan de issue queue is gemigreerd naar git.drupalcode.org
+./update-gitlab-issues.sh    # ±2 sec (schaalt met aantal gitlab-projecten)
 
 # 3. Open in browser
 open projects.html
 open issues.html
 ```
 
-Beide scripts zijn idempotent. `update-issues.sh` kun je vaker draaien dan `build-projects.sh` (issues veranderen dagelijks, project-metadata bijna nooit).
+Alle scripts zijn idempotent. `update-issues.sh` en `update-gitlab-issues.sh` mogen in willekeurige volgorde draaien — beide behouden elkaars rijen in `issues.js`. Als drupal.org ooit de issue-migratie voltooit, verdwijnt `update-issues.sh` en blijft alleen `update-gitlab-issues.sh` over.
 
 ## De twee lijsten die je zelf onderhoudt
 
@@ -41,21 +44,24 @@ Twee bestanden zijn de "bron van waarheid" — verander die, run de scripts, en 
 
 ### `projects-source.csv` — welke projecten willen we volgen?
 
-CSV met drie kolommen en een verplichte header-rij:
+CSV met vier kolommen en een verplichte header-rij:
 
 ```
-machine_name,status,type
-flood_control,active,module
-chameleon,inactive,theme
+machine_name,status,type,issues_source
+flood_control,active,module,drupal.org
+rest_menu_items,active,module,gitlab
+chameleon,inactive,theme,drupal.org
 ```
 
 - **`machine_name`**: het slug in de drupal.org URL (`https://www.drupal.org/project/flood_control` → `flood_control`).
 - **`status`**: `active` of `inactive`. `build-projects.sh` verwerkt beide; `update-issues.sh` slaat `inactive` standaard over (spaart requests) tenzij je `--include-inactive` / `-a` meegeeft.
 - **`type`**: `module` of `theme`. Deze waarde overschrijft de API-derived kind in `projects.js`.
+- **`issues_source`**: `drupal.org` (default) of `gitlab`. Drupal.org migreert issue queues gefaseerd naar git.drupalcode.org — zet dit op `gitlab` zodra je voor een project de migratie-mail van drupal.org krijgt. `update-issues.sh` (api-d7) skipt gitlab-projecten; `update-gitlab-issues.sh` (GitLab REST v4) verwerkt ze.
 
-- **Project toevoegen**: nieuwe regel toevoegen, run beide scripts.
+- **Project toevoegen**: nieuwe regel toevoegen (default `drupal.org` voor issues), run alle scripts.
 - **Project pauzeren**: zet `status` op `inactive`. Metadata blijft bijwerken; issues worden niet meer gefetcht.
-- **Project verwijderen**: regel weghalen, run beide scripts.
+- **Project verwijderen**: regel weghalen, run alle scripts.
+- **Issue queue van project is gemigreerd naar GitLab**: zet `issues_source` op `gitlab`, run `build-projects.sh` + `update-gitlab-issues.sh`.
 
 ### `finalist-maintainers.txt` — wie zijn Finalist-medewerkers?
 
@@ -86,8 +92,8 @@ Bij de eerstvolgende `build-projects.sh` run zie je in projects.html of de match
 | Kolom | Betekenis |
 |-------|-----------|
 | Project | Naam + link naar drupal.org project |
-| Status | "Active", "Needs review", "Needs work", "RTBC", ... |
-| Titel | Titel van het issue; klik → drupal.org issue-pagina |
+| Status | Voor drupal.org-issues: "Active", "Needs review", "Needs work", "RTBC", ... Voor gemigreerde projecten: het GitLab `state::*` label (bijv. `state::needsReview`, `state::accepted`). |
+| Titel | Titel van het issue; klik → drupal.org issue of git.drupalcode.org work item |
 | Versie | Tegen welke versie/branch dit issue speelt (bijv. `3.0.0`, `2.x-dev`) |
 | Gewijzigd | Datum van laatste update (tooltip = tijdstip) |
 

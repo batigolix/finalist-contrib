@@ -1,13 +1,15 @@
 // AI generated
 // Jenkinsfile.update-issues — daily refresh of open issues per project.
 //
-// Copies the latest projects.js artifact from the build-projects job,
-// runs ./update-issues.sh, and archives the refreshed projects.js +
-// issues.js as artifacts.
+// Copies the latest projects.js artifact from the build-projects job, runs
+// both ./update-issues.sh (drupal.org api-d7) and ./update-gitlab-issues.sh
+// (git.drupalcode.org REST v4), and archives the refreshed projects.js +
+// issues.js as artifacts. Both scripts must run in the same job so that
+// issues.js merges rows from both sources into a single artifact.
 //
 // Requirements on the Jenkins agent:
 //   - bash, curl, jq (jq >= 1.6)
-//   - outbound HTTPS to www.drupal.org
+//   - outbound HTTPS to www.drupal.org and git.drupalcode.org
 //   - Copy Artifact Plugin installed on the Jenkins controller
 //   - The upstream build-projects job must have at least one successful build
 
@@ -62,7 +64,7 @@ pipeline {
             }
         }
 
-        stage('Update issues') {
+        stage('Update issues (drupal.org)') {
             steps {
                 sh '''
                     set -e
@@ -72,6 +74,12 @@ pipeline {
                         ./update-issues.sh
                     fi
                 '''
+            }
+        }
+
+        stage('Update issues (gitlab)') {
+            steps {
+                sh './update-gitlab-issues.sh'
             }
         }
 
@@ -113,7 +121,7 @@ pipeline {
                              onlyIfSuccessful: true
         }
         failure {
-            echo 'update-issues.sh failed — check copyArtifacts (upstream job name?) and drupal.org connectivity.'
+            echo 'issue refresh failed — check copyArtifacts (upstream job name?) and connectivity to www.drupal.org / git.drupalcode.org.'
         }
     }
 }

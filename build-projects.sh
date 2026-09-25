@@ -166,12 +166,15 @@ else
 fi
 
 : > "$TMPDIR/entries.jsonl"
-# CSV columns: machine_name,status,type — `kind` in output is overridden by
-# the CSV `type` value (source of truth), the API `type` is discarded.
-while IFS=, read -r slug status kind; do
+# CSV columns: machine_name,status,type,issues_source. `kind` in output is
+# overridden by the CSV `type` value (source of truth); `issues_source`
+# defaults to "drupal.org" when the 4th column is missing or empty.
+while IFS=, read -r slug status kind issues_source; do
   slug=$(printf '%s' "$slug" | tr -d '\r' | tr -d '[:space:]')
   status=$(printf '%s' "$status" | tr -d '\r' | tr -d '[:space:]')
   kind=$(printf '%s' "$kind" | tr -d '\r' | tr -d '[:space:]')
+  issues_source=$(printf '%s' "${issues_source:-}" | tr -d '\r' | tr -d '[:space:]')
+  [ -z "$issues_source" ] && issues_source="drupal.org"
   [ -z "$slug" ] && continue
 
   proj_file="$TMPDIR/proj-$slug.json"
@@ -189,9 +192,10 @@ while IFS=, read -r slug status kind; do
     --argjson terms   "$TERMS" \
     --argjson finalist "$FINALIST_NAMES" \
     --argjson cores   "$cores_json" \
-    --arg slug        "$slug" \
-    --arg status      "$status" \
-    --arg kind        "$kind" \
+    --arg slug          "$slug" \
+    --arg status        "$status" \
+    --arg kind          "$kind" \
+    --arg issues_source "$issues_source" \
     '
     $proj[0].list[0]                          as $p |
     ($rel[0].list[0] // null)                 as $r |
@@ -206,6 +210,7 @@ while IFS=, read -r slug status kind; do
       title: $p.title,
       status: $status,
       kind: $kind,
+      issues_source: $issues_source,
       url: ("https://www.drupal.org/project/" + $slug),
       security_coverage: ($p.field_security_advisory_coverage // "unknown"),
       maintenance_status: ($terms[$p.taxonomy_vocabulary_44.id // ""] // null),
@@ -215,6 +220,7 @@ while IFS=, read -r slug status kind; do
       latest_version: ($r.field_release_version // null),
       latest_release_date: (if ($r.created // null) then ($r.created | tonumber | strftime("%Y-%m-%d")) else null end),
       supported_cores: $cores,
+      open_issues: 0,
       maintainers: $all_maintainers,
       finalist_maintainers: $finalist_maintainers
     }

@@ -2,8 +2,10 @@
 # update-issues.yml — daily refresh of open issues per project + Pages deploy.
 #
 # Downloads the latest projects.js artifact from the "Build projects" workflow,
-# runs ./update-issues.sh, stages a report/ directory (mirroring the Jenkins
-# HTML Publisher output) and deploys it to GitHub Pages.
+# runs both ./update-issues.sh (drupal.org api-d7) and ./update-gitlab-issues.sh
+# (git.drupalcode.org REST v4), stages a report/ directory (mirroring the
+# Jenkins HTML Publisher output) and deploys it to GitHub Pages. Both scripts
+# must run in the same job so that issues.js merges rows from both sources.
 #
 # Prerequisites (one-time, in the repo Settings → Pages):
 #   - Source: "GitHub Actions"
@@ -69,7 +71,7 @@ jobs:
       - name: Sanity check projects.js
         run: test -s projects.js || { echo "projects.js empty or missing" >&2; exit 2; }
 
-      - name: Update issues
+      - name: Update issues (drupal.org)
         run: |
           set -e
           if [ "${{ inputs.include_inactive }}" = "true" ]; then
@@ -77,6 +79,9 @@ jobs:
           else
             ./update-issues.sh
           fi
+
+      - name: Update issues (gitlab)
+        run: ./update-gitlab-issues.sh
 
       - name: Stage HTML report
         run: |

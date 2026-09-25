@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # AI generated
-# update-issues.sh — snapshot of open issues for the Finalist Drupal projects.
-# Reads projects.json, writes issues.json + issues.js for the HTML viewer,
-# and projects-overview.json + projects.js for the projects table.
+# update-issues.sh — snapshot of open issues for the Finalist Drupal projects
+# whose issues still live on drupal.org (issues_source == "drupal.org").
+# Projects with issues_source == "gitlab" are handled by update-gitlab-issues.sh;
+# their rows in issues.js are preserved when this script rewrites the file.
+# Reads projects.js, writes issues.js and rewrites projects.js with a fresh
+# open_issues count for the drupal.org-tracked projects.
 
 set -euo pipefail
 
@@ -97,18 +100,21 @@ export TMPDIR API_BASE
 # filtered subset that we actually fetch issues for.
 ALL_PROJECTS_JSON=$(projects_json)
 
+# Always drop gitlab-issue projects from this run (they are handled by
+# update-gitlab-issues.sh). Their rows in issues.js are preserved further down.
 if [ "$INCLUDE_INACTIVE" -eq 1 ]; then
-  PROJECTS_JSON="$ALL_PROJECTS_JSON"
+  PROJECTS_JSON=$(jq '[.[] | select((.issues_source // "drupal.org") != "gitlab")]' <<<"$ALL_PROJECTS_JSON")
 else
-  PROJECTS_JSON=$(jq '[.[] | select((.status // "active") == "active")]' <<<"$ALL_PROJECTS_JSON")
+  PROJECTS_JSON=$(jq '[.[] | select((.status // "active") == "active" and (.issues_source // "drupal.org") != "gitlab")]' <<<"$ALL_PROJECTS_JSON")
 fi
 
 ALL_COUNT=$(jq 'length' <<<"$ALL_PROJECTS_JSON")
 PROJECTS_COUNT=$(jq 'length' <<<"$PROJECTS_JSON")
+GITLAB_COUNT=$(jq '[.[] | select((.issues_source // "drupal.org") == "gitlab")] | length' <<<"$ALL_PROJECTS_JSON")
 SKIPPED=$((ALL_COUNT - PROJECTS_COUNT))
 
 if [ "$SKIPPED" -gt 0 ]; then
-  echo "Fetching $PROJECTS_COUNT active projects (skipping $SKIPPED inactive; parallel=$PARALLEL, gzip on)..." >&2
+  echo "Fetching $PROJECTS_COUNT drupal.org projects (skipping $SKIPPED: $GITLAB_COUNT gitlab + $((SKIPPED - GITLAB_COUNT)) inactive; parallel=$PARALLEL, gzip on)..." >&2
 else
   echo "Fetching $PROJECTS_COUNT projects (parallel=$PARALLEL, gzip on)..." >&2
 fi
@@ -152,8 +158,24 @@ done < <(jq -r '.[] | "\(.nid) \(.machine_name)"' <<<"$PROJECTS_JSON")
 # Merge parsed per-project issue files into a single JSON blob and stage
 # the big blobs as files so we don't blow past the per-arg limit
 # (Linux MAX_ARG_STRLEN = 128 KB) when we pass them to jq below.
-jq -s 'add // []' "$TMPDIR"/*.parsed.json 2>/dev/null > "$TMPDIR/all_issues.json" \
-  || echo '[]' > "$TMPDIR/all_issues.json"
+jq -s 'add // []' "$TMPDIR"/*.parsed.json 2>/dev/null > "$TMPDIR/fresh_issues.json" \
+  || echo '[]' > "$TMPDIR/fresh_issues.json"
+
+# Preserve existing rows for gitlab-issue projects from a prior issues.js —
+# those are owned by update-gitlab-issues.sh and would otherwise be lost.
+GITLAB_SLUGS=$(jq '[.[] | select((.issues_source // "drupal.org") == "gitlab") | .machine_name]' <<<"$ALL_PROJECTS_JSON")
+PRIOR_ISSUES_FILE="$OUTPUT_DIR/issues.js"
+if [ -f "$PRIOR_ISSUES_FILE" ]; then
+  sed '1d; s/^window\.[a-zA-Z]*Data = //; s/;$//' "$PRIOR_ISSUES_FILE" \
+    | jq --argjson gitlab "$GITLAB_SLUGS" \
+        '(.issues // []) | map(select(.project as $p | $gitlab | index($p)))' \
+    > "$TMPDIR/preserved_issues.json"
+else
+  echo '[]' > "$TMPDIR/preserved_issues.json"
+fi
+
+jq -s 'add' "$TMPDIR/fresh_issues.json" "$TMPDIR/preserved_issues.json" \
+  > "$TMPDIR/all_issues.json"
 
 echo "$ALL_PROJECTS_JSON" > "$TMPDIR/all_projects.json"
 
