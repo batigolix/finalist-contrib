@@ -20,11 +20,6 @@ on:
     # Weekdays 06:00 UTC (~07:00/08:00 Europe/Amsterdam). ~10 sec runtime.
     - cron: '23 6 * * 1-5'
   workflow_dispatch:
-    inputs:
-      include_inactive:
-        description: 'Also fetch issues for status="inactive" projects'
-        type: boolean
-        default: false
   workflow_run:
     workflows: ['Build projects']
     types: [completed]
@@ -72,13 +67,7 @@ jobs:
         run: test -s projects.js || { echo "projects.js empty or missing" >&2; exit 2; }
 
       - name: Update issues (drupal.org)
-        run: |
-          set -e
-          if [ "${{ inputs.include_inactive }}" = "true" ]; then
-            ./update-issues.sh --include-inactive
-          else
-            ./update-issues.sh
-          fi
+        run: ./update-issues.sh
 
       - name: Update issues (gitlab)
         run: ./update-gitlab-issues.sh

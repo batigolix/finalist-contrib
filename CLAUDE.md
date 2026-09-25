@@ -16,15 +16,15 @@ Geen scraping, geen build-server nodig. Alles draait lokaal op `curl` + `jq` + `
 
 ### Source (committed)
 - **`projects-source.csv`** — kolommen `machine_name,status,type,issues_source`. Header-rij is verplicht. Bepaalt welke projecten in de output verschijnen. Handmatig te onderhouden.
-  - `status`: `active` of `inactive`. `build-projects.sh` verwerkt beide; `update-issues.sh` slaat `inactive` standaard over (spaart requests) tenzij `--include-inactive` wordt meegegeven.
+  - `status`: `active` of `inactive`. Puur een label — beïnvloedt de bash scripts niet (alle non-gitlab projecten worden altijd gefetcht). `projects.html` toont standaard alleen `active` via een checkbox.
   - `type`: `module` of `theme`. Bron van waarheid — overschrijft de API-derived `kind` in `projects.js`.
   - `issues_source`: `drupal.org` (default) of `gitlab`. Drupal.org migreert issue queues gefaseerd naar git.drupalcode.org — flip dit veld zodra de migratie-mail voor een project binnenkomt. `update-issues.sh` skipt `gitlab`; `update-gitlab-issues.sh` verwerkt ze.
 - **`finalist-maintainers.txt`** — 1 drupal.org display-name per regel (bijv. `batigolix`, `N Sanders`). Case-insensitive gematcht tegen `/project/<nid>/maintainers.json`.
 - **`term-labels.json`** — cache van drupal.org taxonomy-term IDs → labels (maintenance/development status). Wordt automatisch bijgevuld door `build-projects.sh`.
 
 ### Scripts
-- **`build-projects.sh`** — leest `projects-source.csv`, verrijkt via drupal.org api-d7 (title, latest release, maintainers) + `/project/<nid>/maintainers.json`, matcht tegen `finalist-maintainers.txt`, en schrijft `projects.js`. Verwerkt zowel active als inactive projecten (status wordt gewoon in de output opgenomen). `issues_source` uit de CSV wordt doorgezet naar `projects.js`.
-- **`update-issues.sh`** — leest `projects.js`, haalt de laatste 50 issues per project op via de api-d7 (drupal.org) en schrijft `issues.js` + overschrijft `projects.js` (met `open_issues` count). Skipt `inactive` (default) en `gitlab` (altijd). Rijen voor gitlab-projecten in `issues.js` worden vanuit de vorige run behouden zodat `update-gitlab-issues.sh` in willekeurige volgorde mag draaien. Voor overgeslagen projecten blijft de vorige `open_issues`-waarde behouden.
+- **`build-projects.sh`** — leest `projects-source.csv`, verrijkt via drupal.org api-d7 (title, latest release, maintainers) + `/project/<nid>/maintainers.json`, matcht tegen `finalist-maintainers.txt`, en schrijft `projects.js`. Verwerkt zowel active als inactive projecten. `issues_source` en `status` uit de CSV worden doorgezet naar `projects.js`.
+- **`update-issues.sh`** — leest `projects.js`, haalt de laatste 50 issues per project op via de api-d7 (drupal.org) en schrijft `issues.js` + overschrijft `projects.js` (met `open_issues` count). Fetcht alle non-gitlab projecten (inclusief `inactive`); skipt alleen `issues_source == "gitlab"`. Rijen voor gitlab-projecten in `issues.js` worden vanuit de vorige run behouden zodat `update-gitlab-issues.sh` in willekeurige volgorde mag draaien.
 - **`update-gitlab-issues.sh`** — leest `projects.js`, haalt open work items op via de git.drupalcode.org REST v4 API (`/api/v4/projects/project%2F<slug>/issues?state=opened`) voor projecten met `issues_source == "gitlab"`, mergt in `issues.js` (bestaande drupal.org-rijen blijven staan) en refresh't `open_issues` in `projects.js` alleen voor die projecten. Emit dezelfde issue-schema als `update-issues.sh`; status-label = eerste `state::*` uit `labels`.
 
 ### Viewers
@@ -42,7 +42,7 @@ Geen scraping, geen build-server nodig. Alles draait lokaal op `curl` + `jq` + `
 
 ### Jenkins (optioneel)
 - **`Jenkinsfile.build-projects`** — wekelijkse pipeline (maandag 06:00) die `build-projects.sh` draait en `projects.js` + `term-labels.json` archiveert als build artifacts.
-- **`Jenkinsfile.update-issues`** — dagelijkse pipeline (werkdagen 07:00) die via de Copy Artifact plugin `projects.js` uit de build-projects job trekt, achtereenvolgens `update-issues.sh` en `update-gitlab-issues.sh` draait, en `projects.js` + `issues.js` archiveert. Heeft een `INCLUDE_INACTIVE` boolean-parameter. Beide scripts moeten in dezelfde job draaien omdat ze samen één `issues.js` produceren.
+- **`Jenkinsfile.update-issues`** — dagelijkse pipeline (werkdagen 07:00) die via de Copy Artifact plugin `projects.js` uit de build-projects job trekt, achtereenvolgens `update-issues.sh` en `update-gitlab-issues.sh` draait, en `projects.js` + `issues.js` archiveert. Beide scripts moeten in dezelfde job draaien omdat ze samen één `issues.js` produceren.
 - Jobs verwachten `curl` + `jq` op de agent en outbound HTTPS naar www.drupal.org **en** git.drupalcode.org. De update-issues job noemt de build-projects job standaard `finalist-contrib-build-projects` (via job-parameter aanpasbaar).
 
 ## Workflow
@@ -66,7 +66,7 @@ Alle scripts zijn idempotent. `build-projects.sh` duurt ~20 sec (75 projecten), 
 ## Onderhoud
 
 - **Nieuw project/theme toevoegen**: regel toevoegen aan `projects-source.csv` in het formaat `<machine_name>,active,<module|theme>,drupal.org`. Zoek de exacte machine name op via `https://www.drupal.org/project/<slug>` (URL-segment na `/project/`).
-- **Project pauzeren zonder verwijderen**: zet `status` op `inactive` in de CSV. Metadata blijft ververst via `build-projects.sh`; issues worden alleen nog gefetcht als je `./update-issues.sh --include-inactive` draait.
+- **Project pauzeren zonder verwijderen**: zet `status` op `inactive` in de CSV. Metadata + issues blijven ververst; het project verdwijnt alleen uit de default view in `projects.html` (checkbox "Alleen actieve" is standaard aan).
 - **Issue queue van project migreert naar GitLab** (drupal.org stuurt hierover een mail): zet de vierde kolom `issues_source` op `gitlab`. Run `./build-projects.sh` + `./update-gitlab-issues.sh`. `update-issues.sh` skipt het project vanaf dan automatisch.
 - **Nieuwe Finalist medewerker**: regel toevoegen aan `finalist-maintainers.txt` met de drupal.org display name (kijk op `/u/<slug>` — de tekst in `<h1>` is de correcte naam).
 - **Projecten waar Finalist geen actieve maintainer op is verwijderen**: haal de regel uit `projects-source.csv` en run alle scripts.

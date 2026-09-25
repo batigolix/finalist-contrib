@@ -54,12 +54,12 @@ chameleon,inactive,theme,drupal.org
 ```
 
 - **`machine_name`**: het slug in de drupal.org URL (`https://www.drupal.org/project/flood_control` → `flood_control`).
-- **`status`**: `active` of `inactive`. `build-projects.sh` verwerkt beide; `update-issues.sh` slaat `inactive` standaard over (spaart requests) tenzij je `--include-inactive` / `-a` meegeeft.
+- **`status`**: `active` of `inactive`. Alleen een label — beïnvloedt de bash scripts niet. `projects.html` toont standaard alleen `active` (checkbox "Alleen actieve" uit om ook inactive te zien).
 - **`type`**: `module` of `theme`. Deze waarde overschrijft de API-derived kind in `projects.js`.
 - **`issues_source`**: `drupal.org` (default) of `gitlab`. Drupal.org migreert issue queues gefaseerd naar git.drupalcode.org — zet dit op `gitlab` zodra je voor een project de migratie-mail van drupal.org krijgt. `update-issues.sh` (api-d7) skipt gitlab-projecten; `update-gitlab-issues.sh` (GitLab REST v4) verwerkt ze.
 
 - **Project toevoegen**: nieuwe regel toevoegen (default `drupal.org` voor issues), run alle scripts.
-- **Project pauzeren**: zet `status` op `inactive`. Metadata blijft bijwerken; issues worden niet meer gefetcht.
+- **Project pauzeren**: zet `status` op `inactive`. Metadata + issues blijven bijwerken; het project wordt in `projects.html` standaard verborgen.
 - **Project verwijderen**: regel weghalen, run alle scripts.
 - **Issue queue van project is gemigreerd naar GitLab**: zet `issues_source` op `gitlab`, run `build-projects.sh` + `update-gitlab-issues.sh`.
 

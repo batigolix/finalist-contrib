@@ -27,11 +27,6 @@ pipeline {
             defaultValue: 'Contrib/Build projects',
             description: 'Path (incl. folder) to the Jenkins job that produces projects.js as an artifact. Use folder/job format for jobs inside a folder.'
         )
-        booleanParam(
-            name: 'INCLUDE_INACTIVE',
-            defaultValue: false,
-            description: 'Also fetch issues for projects with status="inactive" in projects-source.csv.'
-        )
     }
 
     options {
@@ -66,14 +61,7 @@ pipeline {
 
         stage('Update issues (drupal.org)') {
             steps {
-                sh '''
-                    set -e
-                    if [ "${INCLUDE_INACTIVE}" = "true" ]; then
-                        ./update-issues.sh --include-inactive
-                    else
-                        ./update-issues.sh
-                    fi
-                '''
+                sh './update-issues.sh'
             }
         }
 

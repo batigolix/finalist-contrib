@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # AI generated
 # update-issues.sh — snapshot of open issues for the Finalist Drupal projects
-# whose issues still live on drupal.org (issues_source == "drupal.org").
-# Projects with issues_source == "gitlab" are handled by update-gitlab-issues.sh;
-# their rows in issues.js are preserved when this script rewrites the file.
-# Reads projects.js, writes issues.js and rewrites projects.js with a fresh
-# open_issues count for the drupal.org-tracked projects.
+# whose issues still live on drupal.org (issues_source == "drupal.org"), both
+# active and inactive. Projects with issues_source == "gitlab" are handled by
+# update-gitlab-issues.sh; their rows in issues.js are preserved when this
+# script rewrites the file. Reads projects.js, writes issues.js and rewrites
+# projects.js with a fresh open_issues count for the drupal.org-tracked
+# projects.
 
 set -euo pipefail
 
@@ -13,7 +14,6 @@ set -euo pipefail
 PROJECTS_FILE="projects.js"
 OUTPUT_DIR="."
 INCLUDE_CLOSED=0
-INCLUDE_INACTIVE=0
 PARALLEL=5
 API_BASE="https://www.drupal.org/api-d7/node.json"
 
@@ -25,8 +25,6 @@ Options:
   --projects FILE       Projects file (default: projects.js — either .js or .json)
   --output-dir DIR      Output directory (default: .)
   --include-closed      Include closed issues in the snapshot
-  --include-inactive|-a Also fetch issues for projects with status="inactive"
-                        (skipped by default to save drupal.org requests)
   -h, --help            Show this message
 EOF
 }
@@ -46,7 +44,6 @@ while [[ $# -gt 0 ]]; do
     --projects)          PROJECTS_FILE="$2"; shift 2 ;;
     --output-dir)        OUTPUT_DIR="$2"; shift 2 ;;
     --include-closed)    INCLUDE_CLOSED=1; shift ;;
-    --include-inactive|-a) INCLUDE_INACTIVE=1; shift ;;
     -h|--help)           usage; exit 0 ;;
     *)                   echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -95,26 +92,18 @@ export -f fetch_project
 export TMPDIR API_BASE
 
 # ─── Parallel fetch via xargs ────────────────────────────────────────────
-# Load projects.js/json once. ALL_PROJECTS_JSON preserves the full tracked
-# list (so inactive projects survive in the output); PROJECTS_JSON is the
-# filtered subset that we actually fetch issues for.
+# Load projects.js/json once. ALL_PROJECTS_JSON is the full tracked list;
+# PROJECTS_JSON drops the gitlab-issue projects (owned by
+# update-gitlab-issues.sh).
 ALL_PROJECTS_JSON=$(projects_json)
-
-# Always drop gitlab-issue projects from this run (they are handled by
-# update-gitlab-issues.sh). Their rows in issues.js are preserved further down.
-if [ "$INCLUDE_INACTIVE" -eq 1 ]; then
-  PROJECTS_JSON=$(jq '[.[] | select((.issues_source // "drupal.org") != "gitlab")]' <<<"$ALL_PROJECTS_JSON")
-else
-  PROJECTS_JSON=$(jq '[.[] | select((.status // "active") == "active" and (.issues_source // "drupal.org") != "gitlab")]' <<<"$ALL_PROJECTS_JSON")
-fi
+PROJECTS_JSON=$(jq '[.[] | select((.issues_source // "drupal.org") != "gitlab")]' <<<"$ALL_PROJECTS_JSON")
 
 ALL_COUNT=$(jq 'length' <<<"$ALL_PROJECTS_JSON")
 PROJECTS_COUNT=$(jq 'length' <<<"$PROJECTS_JSON")
-GITLAB_COUNT=$(jq '[.[] | select((.issues_source // "drupal.org") == "gitlab")] | length' <<<"$ALL_PROJECTS_JSON")
-SKIPPED=$((ALL_COUNT - PROJECTS_COUNT))
+GITLAB_COUNT=$((ALL_COUNT - PROJECTS_COUNT))
 
-if [ "$SKIPPED" -gt 0 ]; then
-  echo "Fetching $PROJECTS_COUNT drupal.org projects (skipping $SKIPPED: $GITLAB_COUNT gitlab + $((SKIPPED - GITLAB_COUNT)) inactive; parallel=$PARALLEL, gzip on)..." >&2
+if [ "$GITLAB_COUNT" -gt 0 ]; then
+  echo "Fetching $PROJECTS_COUNT drupal.org projects (skipping $GITLAB_COUNT gitlab; parallel=$PARALLEL, gzip on)..." >&2
 else
   echo "Fetching $PROJECTS_COUNT projects (parallel=$PARALLEL, gzip on)..." >&2
 fi
